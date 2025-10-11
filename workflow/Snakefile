@@ -2,11 +2,6 @@
 include: "rules/utility.smk"
 
 
-from pathlib import Path
-
-SCRIPTS_DIR = Path(__file__).parent / "scripts"
-
-
 ## Load config values
 configfile: "config/defaults.yaml"
 configfile: "config/samples.yaml"
@@ -241,7 +236,7 @@ rule rsemExpressionMatrix:
         "output/{sample}/0_alignment/expression_matrix.tsv",
     params:
         annotation="annotation/biomart_ensembl100_GRCh38.sorted.bed",
-        script=str(SCRIPTS_DIR / "generateExpressionMatrix.R"),
+        script="workflow/scripts/generateExpressionMatrix.R",
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
@@ -479,7 +474,7 @@ if phased:
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
         params:
-            script=str(SCRIPTS_DIR / "mbased.snpEff.R"),
+            script="workflow/scripts/mbased.snpEff.R",
         log:
             "output/{sample}/log/mbased.log",
         shell:
@@ -502,7 +497,7 @@ else:
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
         params:
-            script=str(SCRIPTS_DIR / "mbased.snpEff.R"),
+            script="workflow/scripts/mbased.snpEff.R",
         log:
             "output/{sample}/log/mbased.log",
         shell:
@@ -524,7 +519,7 @@ rule addExpression:
         "docker://glenn032787/ase_rcontainer:2.0"
     params:
         maf=config["maf_threshold"],
-        script=str(SCRIPTS_DIR / "addExpression.R"),
+        script="workflow/scripts/addExpression.R",
     log:
         "output/{sample}/log/addExpression.log",
     shell:
@@ -550,7 +545,7 @@ rule figures:
         "docker://glenn032787/ase_rcontainer:2.0"
     params:
         maf=config["maf_threshold"],
-        script=str(SCRIPTS_DIR / "figures.R"),
+        script="workflow/scripts/figures.R",
     log:
         "output/{sample}/log/figures.log",
     shell:
@@ -632,7 +627,7 @@ rule cnv_preprocess:
         "output/{sample}/3_cancer/raw/cnv.bed",
     params:
         tumor=getTumorContent,
-        script=str(SCRIPTS_DIR / "cnv_preprocess.R"),
+        script="workflow/scripts/cnv_preprocess.R",
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
@@ -674,7 +669,7 @@ rule dmr_preprocess:
     output:
         "output/{sample}/3_cancer/raw/methyl.bed",
     params:
-        script=str(SCRIPTS_DIR / "methyl_preprocess.R"),
+        script="workflow/scripts/methyl_preprocess.R",
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
@@ -788,7 +783,7 @@ rule compareTFBS:
         "docker://glenn032787/ase_rcontainer:2.0"
     params:
         tf_list="annotation/human_mono_motifs.tsv",
-        script=str(SCRIPTS_DIR / "compareTFBS.R"),
+        script="workflow/scripts/compareTFBS.R",
     log:
         "output/{sample}/log/compareTFBS.log",
     shell:
@@ -844,7 +839,7 @@ rule oneLine:
     output:
         temp("output/{sample}/3_cancer/stopVar/phase.oneline.annotate.vcf"),
     params:
-        script=str(SCRIPTS_DIR / "vcfEffOnePerLine.pl"),
+        script="workflow/scripts/vcfEffOnePerLine.pl",
     container:
         "docker://quay.io/biocontainers/snpeff:5.0--hdfd78af_1"
     log:
@@ -880,7 +875,7 @@ rule getStopMutation:
     output:
         "output/{sample}/3_cancer/stopVar/stop_variant.tsv",
     params:
-        script=str(SCRIPTS_DIR / "stopVariant.R"),
+        script="workflow/scripts/stopVariant.R",
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
@@ -954,7 +949,7 @@ rule summaryTableCancer:
         normal="annotation/phaserNormalASE.tsv",
         tissue=checkTissue,
         tumorContent=getTumorContent,
-        script=str(SCRIPTS_DIR / "summaryTable.R"),
+        script="workflow/scripts/summaryTable.R",
     log:
         "output/{sample}/log/summaryTable.log",
     shell:
@@ -987,7 +982,7 @@ rule cancerFigures:
     output:
         "output/{sample}/figures/aseCause.pdf",
     params:
-        script=str(SCRIPTS_DIR / "cancerFigures.R"),
+        script="workflow/scripts/cancerFigures.R",
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
@@ -1017,7 +1012,7 @@ rule karyogram:
     output:
         "output/{sample}/figures/karyogram.pdf",
     params:
-        script=str(SCRIPTS_DIR / "karyogramFigure.R"),
+        script="workflow/scripts/karyogramFigure.R",
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:

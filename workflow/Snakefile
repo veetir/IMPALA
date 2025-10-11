@@ -1,5 +1,10 @@
 # Load utility file
-include: "src/utility.smk"
+include: "rules/utility.smk"
+
+
+from pathlib import Path
+
+SCRIPTS_DIR = Path(__file__).parent / "scripts"
 
 
 ## Load config values
@@ -236,13 +241,14 @@ rule rsemExpressionMatrix:
         "output/{sample}/0_alignment/expression_matrix.tsv",
     params:
         annotation="annotation/biomart_ensembl100_GRCh38.sorted.bed",
+        script=str(SCRIPTS_DIR / "generateExpressionMatrix.R"),
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
         "output/{sample}/log/rsemExpressionMatrix.log",
     shell:
         """
-        Rscript src/generateExpressionMatrix.R \
+        Rscript {params.script} \
             -i {input} \
             -o output/{wildcards.sample}/0_alignment \
             -a {params.annotation} \
@@ -267,7 +273,7 @@ rule phase_vcf_filter:
     shell:
         """
         mkdir -p output/{wildcards.sample}/1_variant
-        zcat {input.phase} | grep -E '(PASS|#)' | grep -E '(0/1|\||#)' | awk '(/^#/ || (length($4) == 1 && length($5) == 1))' | bgzip > {output} 2> {log}
+        zcat {input.phase} | grep -E '(PASS|#)' | grep -E '(0/1|\\||#)' | awk '(/^#/ || (length($4) == 1 && length($5) == 1))' | bgzip > {output} 2> {log}
         """
 
 
@@ -472,11 +478,13 @@ if phased:
         threads: config["threads"]
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
+        params:
+            script=str(SCRIPTS_DIR / "mbased.snpEff.R"),
         log:
             "output/{sample}/log/mbased.log",
         shell:
             """
-            Rscript src/mbased.snpEff.R \
+            Rscript {params.script} \
                 --threads={threads} \
                 --phase={input.phase} \
                 --rna={input.tsv} \
@@ -493,11 +501,13 @@ else:
         threads: config["threads"]
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
+        params:
+            script=str(SCRIPTS_DIR / "mbased.snpEff.R"),
         log:
             "output/{sample}/log/mbased.log",
         shell:
             """
-            Rscript src/mbased.snpEff.R \
+            Rscript {params.script} \
                 --threads={threads} \
                 --rna={input.tsv} \
                 --outdir=output/{wildcards.sample}/2_mBASED &> {log}
@@ -514,11 +524,12 @@ rule addExpression:
         "docker://glenn032787/ase_rcontainer:2.0"
     params:
         maf=config["maf_threshold"],
+        script=str(SCRIPTS_DIR / "addExpression.R"),
     log:
         "output/{sample}/log/addExpression.log",
     shell:
         """
-        Rscript src/addExpression.R \
+        Rscript {params.script} \
             --mbased={input.rds} \
             --sample={wildcards.sample} \
             --rpkm={input.rpkm} \
@@ -539,13 +550,14 @@ rule figures:
         "docker://glenn032787/ase_rcontainer:2.0"
     params:
         maf=config["maf_threshold"],
+        script=str(SCRIPTS_DIR / "figures.R"),
     log:
         "output/{sample}/log/figures.log",
     shell:
         """
         mkdir -p output/{wildcards.sample}/figures
 
-        Rscript src/figures.R \
+        Rscript {params.script} \
             --mbased={input.txt} \
             --rpkm={input.rpkm} \
             --gene={input.bed} \
@@ -620,13 +632,14 @@ rule cnv_preprocess:
         "output/{sample}/3_cancer/raw/cnv.bed",
     params:
         tumor=getTumorContent,
+        script=str(SCRIPTS_DIR / "cnv_preprocess.R"),
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
         "output/{sample}/log/cnv_preprocess.log",
     shell:
         """
-        Rscript src/cnv_preprocess.R \
+        Rscript {params.script} \
             --cnv={input} \
             --tumorContent={params.tumor} \
             --outdir=output/{wildcards.sample}/3_cancer/raw &> {log}
@@ -660,13 +673,15 @@ rule dmr_preprocess:
         lambda w: config["samples"][w.sample]["methyl"],
     output:
         "output/{sample}/3_cancer/raw/methyl.bed",
+    params:
+        script=str(SCRIPTS_DIR / "methyl_preprocess.R"),
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
         "output/{sample}/log/dmr_preprocess.log",
     shell:
         """
-        Rscript src/methyl_preprocess.R \
+        Rscript {params.script} \
             --methyl={input} \
             --outdir=output/{wildcards.sample}/3_cancer/raw &> {log}
         """
@@ -773,11 +788,12 @@ rule compareTFBS:
         "docker://glenn032787/ase_rcontainer:2.0"
     params:
         tf_list="annotation/human_mono_motifs.tsv",
+        script=str(SCRIPTS_DIR / "compareTFBS.R"),
     log:
         "output/{sample}/log/compareTFBS.log",
     shell:
         """
-        Rscript src/compareTFBS.R \
+        Rscript {params.script} \
             --allele1={input.a1} \
             --allele2={input.a2} \
             --expression_matrix={input.expression_matrix} \
@@ -827,13 +843,15 @@ rule oneLine:
         "output/{sample}/3_cancer/stopVar/phase.annotate.vcf",
     output:
         temp("output/{sample}/3_cancer/stopVar/phase.oneline.annotate.vcf"),
+    params:
+        script=str(SCRIPTS_DIR / "vcfEffOnePerLine.pl"),
     container:
         "docker://quay.io/biocontainers/snpeff:5.0--hdfd78af_1"
     log:
         "output/{sample}/log/oneLine.log",
     shell:
         """
-        cat {input} | src/vcfEffOnePerLine.pl > {output} 2> {log}
+        cat {input} | {params.script} > {output} 2> {log}
         """
 
 
@@ -861,13 +879,15 @@ rule getStopMutation:
         "output/{sample}/3_cancer/stopVar/phase.annotate.tsv",
     output:
         "output/{sample}/3_cancer/stopVar/stop_variant.tsv",
+    params:
+        script=str(SCRIPTS_DIR / "stopVariant.R"),
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
         "output/{sample}/log/getStopMutation.log",
     shell:
         """
-        Rscript src/stopVariant.R \
+        Rscript {params.script} \
             --annotation={input} \
             --outdir=output/{wildcards.sample}/3_cancer/stopVar &> {log}
         """
@@ -934,11 +954,12 @@ rule summaryTableCancer:
         normal="annotation/phaserNormalASE.tsv",
         tissue=checkTissue,
         tumorContent=getTumorContent,
+        script=str(SCRIPTS_DIR / "summaryTable.R"),
     log:
         "output/{sample}/log/summaryTable.log",
     shell:
         """
-        Rscript src/summaryTable.R \
+        Rscript {params.script} \
             --cnv={input.cnv} \
             --methyl={input.methyl} \
             --tfbs={input.tfbs} \
@@ -965,6 +986,8 @@ rule cancerFigures:
         "output/{sample}/summaryTable.tsv",
     output:
         "output/{sample}/figures/aseCause.pdf",
+    params:
+        script=str(SCRIPTS_DIR / "cancerFigures.R"),
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
@@ -973,7 +996,7 @@ rule cancerFigures:
         """
         mkdir -p output/{wildcards.sample}/figures/tables
     
-        Rscript src/cancerFigures.R \
+        Rscript {params.script} \
             --summary={input} \
             --outdir=output/{wildcards.sample}/figures \
             --sample={wildcards.sample} &> {log}
@@ -993,13 +1016,15 @@ rule karyogram:
         annotation="annotation/biomart_ensembl100_GRCh38.sorted.bed",
     output:
         "output/{sample}/figures/karyogram.pdf",
+    params:
+        script=str(SCRIPTS_DIR / "karyogramFigure.R"),
     container:
         "docker://glenn032787/ase_rcontainer:2.0"
     log:
         "output/{sample}/log/karyogram.log",
     shell:
         """
-        Rscript src/karyogramFigure.R \
+        Rscript {params.script} \
                 --chromSize={input.chromSize} \
                 --centPos={input.centromere} \
                 --cna={input.cnv} \

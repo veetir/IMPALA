@@ -3,6 +3,9 @@ run-name: ${{ github.actor }} testing Snakemake workflow 🚀
 on:
   pull_request:
     types: [opened, reopened]
+
+  workflow_dispatch:
+
 defaults:
   run:
     shell: bash -l {0}

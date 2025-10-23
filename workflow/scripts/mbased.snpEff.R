@@ -26,7 +26,7 @@ option_list = list(
               help="Tumour RNA vcf file (from Strelka2)", metavar="character"),
   make_option(c("-o", "--outdir"), type="character", default = "mBASED",
               help="Output directory name", metavar="character"),
-  make_option(c("-t", "--threads"), type="integer", default = "mBASED",
+  make_option(c("-t", "--threads"), type="integer", default = 1,
               help="Threads used for mbased", metavar="integer")
 )
 

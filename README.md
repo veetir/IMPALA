@@ -1,9 +1,11 @@
-<img src="res/impala_logo.png" width="280" height="280">
+<img src="images/res/impala_logo.png" width="280" height="280">
 
 # Integrated Mapping and Profiling of Allelically-expressed Loci with Annotations 
 [![DOI](https://zenodo.org/badge/590257376.svg)](https://zenodo.org/badge/latestdoi/590257376)
 [![Lint & Format](https://github.com/veetir/IMPALA/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/veetir/IMPALA/actions/workflows/lint.yml)
 [![Snakemake](https://img.shields.io/badge/snakemake-≥8.0.0-brightgreen.svg?style=flat)](https://snakemake.readthedocs.io)
+![status: experimental](https://img.shields.io/badge/status-experimental-orange)
+
 
 This Snakemake workflow calls allele-specific expression genes using short-read RNA-seq. Phasing information derived from long-read data by tools such as WhatsHap can be provided to increase the performance of the tool, and to link results to features of interest. Copy number variant data, allelic methylation data and somatic variant data can also be provided to analyze genes with allele specific expression.
 
@@ -27,7 +29,7 @@ Table of Contents
 
 
 # Overall Workflow
-<img src="res/IMPALA_workflow.jpg" width=90%>
+<img src="images/res/IMPALA_workflow.jpg" width=90%>
 
 <br>
 
@@ -179,12 +181,35 @@ centromere:
 
 
 
-### **Run snakemake**
-This is the command to run it with singularity. The `-c` parameter can be used to specify maximum number of threads. The `-B` parameter is used to specify paths for the docker container to bind. 
+### **Run IMPALA**
 
+IMPALA is executed through **Snakemake profiles**.
+
+Before running the workflow, ensure you have:
+
+- **Singularity / Apptainer**
+- **Python ≥ 3.12** (tested with Python 3.13)
+- A **virtual environment** with the required packages installed:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
-snakemake -c 30 --use-singularity --singularity-args "-B /projects,/home,/gsc"
+#### Run using profiles
+1. Modify the profile YAML files as needed to suit your environment.
+
+2. A: To run the workflow interactively:
+```bash
+snakemake --profile profiles/interactive
 ```
+
+2. B: To run the workflow on a SLURM cluster:
+
+```bash
+snakemake --profile profiles/slurm
+```
+
 # Output Files
 All output and intermediary files are found in `output/{sample}` directory. The workflow has four main sections, alignment, variant calling, mbased and cancer analysis and their outputs can be found in the corresponding directories. The key outputs from the workflow are listed below
 
@@ -232,7 +257,7 @@ Columns only included if optional input is included:
 
 # Example Figures
 
-Several figures are automatically generated based on the optional inputs. They can be found in `output/{sample}/figures`. The main figure is `karyogram.pdf` which show colocalization of ASE genes with allelic methylation and somatic copy number alteration. Example figures can be found [here](res/exampleFigure.md). 
+Several figures are automatically generated based on the optional inputs. They can be found in `output/{sample}/figures`. The main figure is `karyogram.pdf` which show colocalization of ASE genes with allelic methylation and somatic copy number alteration. Example figures can be found [here](images/res/exampleFigure.md). 
 
 
 # Contributors

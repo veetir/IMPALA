@@ -4,6 +4,8 @@
 [![DOI](https://zenodo.org/badge/590257376.svg)](https://zenodo.org/badge/latestdoi/590257376)
 [![Lint & Format](https://github.com/veetir/IMPALA/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/veetir/IMPALA/actions/workflows/lint.yml)
 [![Snakemake](https://img.shields.io/badge/snakemake-≥8.0.0-brightgreen.svg?style=flat)](https://snakemake.readthedocs.io)
+![status: experimental](https://img.shields.io/badge/status-experimental-orange)
+
 
 This Snakemake workflow calls allele-specific expression genes using short-read RNA-seq. Phasing information derived from long-read data by tools such as WhatsHap can be provided to increase the performance of the tool, and to link results to features of interest. Copy number variant data, allelic methylation data and somatic variant data can also be provided to analyze genes with allele specific expression.
 

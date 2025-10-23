@@ -1,4 +1,5 @@
 from snakemake.utils import min_version
+from pathlib import Path
 
 
 include: "rules/utility.smk"
@@ -70,6 +71,20 @@ if cancer_analysis:
     figure = expand("output/{sample}/figures/aseCause.pdf", sample=sample_ids)
 else:
     figure = []
+
+
+### -------------------------------------------------------------------
+### Compatibility rule
+### -------------------------------------------------------------------
+rule build_chrmap:
+    input:
+        fai = f"{genome_path}.fai"
+    output:
+        map = "output/common/auto_chrmap.tsv"
+    log:
+        "output/common/log/build_chrmap.log"
+    script:
+        workflow.source_path("scripts/build_chrmap.py")
 
 
 ### -------------------------------------------------------------------

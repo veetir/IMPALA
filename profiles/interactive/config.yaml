@@ -1,0 +1,4 @@
+use-singularity: true
+singularity-args: "--cleanenv --env LANG=C.UTF-8 --env LC_ALL=C.UTF-8" # bind folders using -B
+cores: 10                          # adjust number of cores to be used
+printshellcmds: true

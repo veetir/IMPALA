@@ -1,0 +1,16 @@
+executor: slurm
+software-deployment-method: apptainer
+singularity-args: "--cleanenv" # Bind folders using -B
+
+# job control
+jobs: 10
+local-cores: 1
+printshellcmds: true
+latency-wait: 60
+restart-times: 1
+
+# default resources
+default-resources:
+  slurm_partition: "small"
+  mem_mb: 4000
+  runtime: 180

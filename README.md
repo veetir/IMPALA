@@ -78,7 +78,7 @@ git clone https://github.com/bcgsc/IMPALA.git
 ### **Edit the config files**
 
 #### **Example parameters.yaml:** <br />
-Config files to specify parameters and paths needed for the workflow. The main parameter to include is the genome name, path to expression matrix, major allele frequency threshold and threads as well as settings for using phased vcf and doing cancer analysis.
+Config files to specify parameters and paths needed for the workflow. The main parameter to include is the genome name, path to expression matrix, major allele frequency threshold as well as settings for using phased vcf and doing cancer analysis.
 ```
 # genome_name should match bams
 genome_name: hg38/hg19/hg38_no_alt_TCGA_HTMCP_HPVs
@@ -88,9 +88,6 @@ matrix: /path/to/expression/matrix.tsv
 
 # Major allele frequency threshold for ASE (0.5 - 0.75)
 maf_threshold: 0.65
-
-# Threads for STAR, RSEM, Strelka and MBASED
-threads: 72
 
 # Use phased vcf (True or False)
 # Uses pseudphasing algorithm if False

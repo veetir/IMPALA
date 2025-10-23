@@ -98,7 +98,6 @@ rule params:
         phase=config["phased"],
         cancer=config["cancer_analysis"],
         maf=config["maf_threshold"],
-        threads=config["threads"],
     shell:
         """
         date >> {output} 2> {log}
@@ -110,7 +109,6 @@ rule params:
         echo Genome: {params.genome_name} >> {output} 2> {log}
         echo Phased: {params.phase}  >> {output} 2> {log}
         echo Cancer analysis: {params.cancer} >> {output} 2> {log}
-        echo Threads: {params.threads} >> {output} 2> {log}
         """
 
 

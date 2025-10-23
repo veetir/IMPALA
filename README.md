@@ -2,8 +2,8 @@
 
 # Integrated Mapping and Profiling of Allelically-expressed Loci with Annotations 
 [![DOI](https://zenodo.org/badge/590257376.svg)](https://zenodo.org/badge/latestdoi/590257376)
-[![example workflow](https://github.com/bcgsc/IMPALA/actions/workflows/run_snakemake.yaml/badge.svg)](https://github.com/bcgsc/IMPALA/actions/workflows/run_snakemake.yaml)
-[![Snakemake](https://img.shields.io/badge/snakemake-≥5.6.0-brightgreen.svg?style=flat)](https://snakemake.readthedocs.io)
+[![CI](https://github.com/veetir/IMPALA/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/veetir/IMPALA/actions/workflows/lint.yml)
+[![Snakemake](https://img.shields.io/badge/snakemake-≥8.0.0-brightgreen.svg?style=flat)](https://snakemake.readthedocs.io)
 
 This Snakemake workflow calls allele-specific expression genes using short-read RNA-seq. Phasing information derived from long-read data by tools such as WhatsHap can be provided to increase the performance of the tool, and to link results to features of interest. Copy number variant data, allelic methylation data and somatic variant data can also be provided to analyze genes with allele specific expression.
 
@@ -16,9 +16,9 @@ Table of Contents
   * [Dependencies](#dependencies)
 * **[Input Files](#input-files)**
   * [Optional input](#optional-inputs)
-* **[Running Workflow](#running-workflow)**
+* **[Running the Workflow](#running-workflow)**
   * [Edit config file](#edit-the-config-files)
-  * [Running snakemake workflow](#run-snakemake)
+  * [Running the Snakemake workflow](#run-snakemake)
 * **[Output Files](#optional-inputs)**
   * [Summary Output](#summary-table-description)
   * [Example Figures](#example-figures)
@@ -32,13 +32,13 @@ Table of Contents
 <br>
 
 # Installation
-This will clone the repository. You can run the IMPALA within this directory.
+This will clone the repository. You can run the IMPALA from within this directory.
 ```
 git clone https://github.com/bcgsc/IMPALA.git
 ```
 
 ### Dependencies
-> To run this workflow, you must have snakemake (v6.12.3) and singularity (v3.5.2-1.1.el7). You can install snakemake using [this guide](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html) and singularity using [this guide](https://docs.sylabs.io/guides/3.5/admin-guide/installation.html). The remaining dependencies will be downloaded automatically within the snakemake workflow.
+> To run this workflow, you must have snakemake (>= 8.0.0) and Singularity. You can install Snakemake using [this guide](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html) and singularity using [this guide](https://docs.sylabs.io/guides/3.5/admin-guide/installation.html). The remaining dependencies will be downloaded automatically within the Snakemake workflow.
 
 # Input Files
 
@@ -50,7 +50,7 @@ git clone https://github.com/bcgsc/IMPALA.git
 - Expression Matrix 
     - Expression in RPKM/TPM
     - Gene name must be in HGNC format
-    - Column name is "Gene" and sample names
+    - Column name is `gene` (case-sensitive) and sample names
 
 
 ### **Optional Inputs:**
@@ -59,19 +59,19 @@ git clone https://github.com/bcgsc/IMPALA.git
     - Significantly improves precision of ASE calling
     - Adds TFBS mutation and stop gain/loss information 
  - Copy Number Variant Data
-    - Can be optained using [ploidetect](https://github.com/lculibrk/Ploidetect)
+    - Can be obtained using [ploidetect](https://github.com/lculibrk/Ploidetect)
 - Allelic Methylation
-    - Can be optained using [NanoMethPhase](https://github.com/vahidAK/NanoMethPhase)
+    - Can be obtained using [NanoMethPhase](https://github.com/vahidAK/NanoMethPhase)
 - Somatic mutations
     - Finds somatic mutations in ASE gene and promoters
 - Tumor Content
-    - Used to calcualte the expected major allele frequency 
+    - Used to calculate the expected major allele frequency 
     - Assumes 1.0 if not specified
 - Tissue type
-    - Include data for average MAF in normal tissue in summary table
-    - Otained from GTex database which ran [phASER](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-020-02122-z) to calcualte allelic expression 
+    - Includes data for average MAF in normal tissue in summary table
+    - Obtained from GTex database which used [phASER](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-020-02122-z) to calculate allelic expression 
 
-# Running Workflow
+# Running the Workflow
 
 ### **Edit the config files**
 
@@ -149,7 +149,7 @@ samples:
 
 
 #### **Example defaults.yaml:** <br />
-Config file for specify path for reference genome, annotation bed file and centromere bed file. Annotation and centromere bed file for hg38 are included in the repository.
+Config file for specifying paths for reference genome, annotation bed file and centromere bed file. Annotation and centromere bed file for hg38 are included in the repository.
 
 ```
 genome:
@@ -180,13 +180,13 @@ centromere:
 
 
 ### **Run snakemake**
-This is the command to run it with singularity. The `-c` parameter can be used to specify maximum number of threads. The `-B` parameter is used to speceify paths for the docker container to bind. 
+This is the command to run it with singularity. The `-c` parameter can be used to specify maximum number of threads. The `-B` parameter is used to specify paths for the docker container to bind. 
 
 ```
 snakemake -c 30 --use-singularity --singularity-args "-B /projects,/home,/gsc"
 ```
 # Output Files
-All output and intermediary files is found in `output/{sample}` directory. The workflow has four main section, alignment, variant calling, mbased and cancer analysis and their outputs can be found in the corrosponding directories. The key outputs from the workflow is located below
+All output and intermediary files are found in `output/{sample}` directory. The workflow has four main sections, alignment, variant calling, mbased and cancer analysis and their outputs can be found in the corresponding directories. The key outputs from the workflow are listed below
 
 1. MBASED related outputs (found in `output/{sample}/mbased`)
     - The tabular results of the output `MBASED_expr_gene_results.txt`
@@ -206,13 +206,13 @@ All output and intermediary files is found in `output/{sample}` directory. The w
 | Expression           | Expression level                                                                       | 
 | allele1IsMajor       | T/F if allele 1 is the major allele (allele 1 = HP1)                                   | 
 | majorAlleleFrequency | Major allele frequency                                                                 | 
-| padj                 | Benjamini-Hochberg adjusted pvalue                                                     | 
-| aseResults           | ASE result based on MAF threshold (and pval)                                           | 
+| padj                 | Benjamini-Hochberg adjusted p-value                                                     | 
+| aseResults           | ASE result based on MAF threshold (and p-value)                                           | 
 | cnv.A<sup>1</sup>               | Copy Number for allele 1                                                               |
 | cnv.B<sup>1</sup>              | Copy Number for allele 2                                                               |
 | expectedMAF<sup>1</sup>         | Expect Major Allele Frequency based on CNV                                             |
 | cnv_state<sup>1</sup>           | Allelic CNV state (Loss of Heterozygosity, Allelic balance/imbalabnce)                 |
-| methyl_state<sup>2</sup>       | Methylation difference in promter region (Allele 1 - Allele 2) |
+| methyl_state<sup>2</sup>       | Methylation difference in promoter region (Allele 1 - Allele 2) |
 | tf_allele<sup>3</sup>         | Allele where there is gain of transcription factor binding site                        |
 | transcriptionFactor<sup>3</sup> | Transcription Factor for gain TFBS                                                     |
 | stop_variant_allele<sup>3</sup> | Allele where stop gain/stop loss variant is found                                      |
@@ -232,7 +232,7 @@ Columns only included if optional input is included:
 
 # Example Figures
 
-Several figures are automatically generate based on the optional inputs. They can be found in `output/{sample}/figures`. The main figure is `karyogram.pdf` which show co-locationzation of ASE genes with allelic methylation and somatic copy number alteration. Example figures can be found [here](res/exampleFigure.md). 
+Several figures are automatically generated based on the optional inputs. They can be found in `output/{sample}/figures`. The main figure is `karyogram.pdf` which show colocalization of ASE genes with allelic methylation and somatic copy number alteration. Example figures can be found [here](res/exampleFigure.md). 
 
 
 # Contributors

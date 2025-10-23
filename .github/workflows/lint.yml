@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Prepare CI artifacts directory
+        run: |
+          mkdir -p artifacts/ci
+
+      - name: Capture environment details
+        run: |
+          source .venv/bin/activate
+          python --version > artifacts/ci/env.txt
+          pip freeze >> artifacts/ci/env.txt
+
+      - name: snakefmt check
+        run: |
+          source .venv/bin/activate
+          snakefmt --check workflow/
+
+      - name: Snakemake lint
+        run: |
+          set -o pipefail
+          source .venv/bin/activate
+          snakemake --lint -s workflow/Snakefile | tee artifacts/ci/lint_current.txt
+
+      - name: Upload CI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-artifacts
+          path: artifacts/ci/
+

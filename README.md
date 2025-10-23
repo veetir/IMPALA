@@ -1,4 +1,4 @@
-<img src="res/impala_logo.png" width="280" height="280">
+<img src="images/res/impala_logo.png" width="280" height="280">
 
 # Integrated Mapping and Profiling of Allelically-expressed Loci with Annotations 
 [![DOI](https://zenodo.org/badge/590257376.svg)](https://zenodo.org/badge/latestdoi/590257376)
@@ -27,7 +27,7 @@ Table of Contents
 
 
 # Overall Workflow
-<img src="res/IMPALA_workflow.jpg" width=90%>
+<img src="images/res/IMPALA_workflow.jpg" width=90%>
 
 <br>
 
@@ -232,7 +232,7 @@ Columns only included if optional input is included:
 
 # Example Figures
 
-Several figures are automatically generated based on the optional inputs. They can be found in `output/{sample}/figures`. The main figure is `karyogram.pdf` which show colocalization of ASE genes with allelic methylation and somatic copy number alteration. Example figures can be found [here](res/exampleFigure.md). 
+Several figures are automatically generated based on the optional inputs. They can be found in `output/{sample}/figures`. The main figure is `karyogram.pdf` which show colocalization of ASE genes with allelic methylation and somatic copy number alteration. Example figures can be found [here](images/res/exampleFigure.md). 
 
 
 # Contributors

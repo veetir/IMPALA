@@ -181,12 +181,35 @@ centromere:
 
 
 
-### **Run snakemake**
-This is the command to run it with singularity. The `-c` parameter can be used to specify maximum number of threads. The `-B` parameter is used to specify paths for the docker container to bind. 
+### **Run IMPALA**
 
+IMPALA is executed through **Snakemake profiles**.
+
+Before running the workflow, ensure you have:
+
+- **Singularity / Apptainer**
+- **Python ≥ 3.12** (tested with Python 3.13)
+- A **virtual environment** with the required packages installed:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
-snakemake -c 30 --use-singularity --singularity-args "-B /projects,/home,/gsc"
+#### Run using profiles
+1. Modify the profile YAML files as needed to suit your environment.
+
+2. A: To run the workflow interactively:
+```bash
+snakemake --profile profiles/interactive
 ```
+
+2. B: To run the workflow on a SLURM cluster:
+
+```bash
+snakemake --profile profiles/slurm
+```
+
 # Output Files
 All output and intermediary files are found in `output/{sample}` directory. The workflow has four main sections, alignment, variant calling, mbased and cancer analysis and their outputs can be found in the corresponding directories. The key outputs from the workflow are listed below
 

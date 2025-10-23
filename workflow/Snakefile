@@ -1,5 +1,10 @@
-# Load utility file
+from snakemake.utils import min_version
+
+
 include: "rules/utility.smk"
+
+
+min_version("8.0.0")
 
 
 ## Load config values

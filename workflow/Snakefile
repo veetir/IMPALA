@@ -453,9 +453,9 @@ rule snpEff:
     input:
         vcf,
     output:
-        temp("output/{sample}/1_variant/rna.isec.snps.snpEff.vcf"),
+        "output/{sample}/1_variant/rna.isec.snps.snpEff.vcf",
     container:
-        "docker://quay.io/biocontainers/snpeff:5.0--hdfd78af_1"
+        "docker://quay.io/biocontainers/snpeff:4.3i--0"
     params:
         genome=config["annotationPath"]["snpEff_genomeName"],
         snpEff_config=config["annotationPath"]["snpEff_config"],

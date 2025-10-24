@@ -1,5 +1,4 @@
 from snakemake.utils import min_version
-from pathlib import Path
 
 
 include: "rules/utility.smk"
@@ -73,19 +72,6 @@ else:
     figure = []
 
 
-### -------------------------------------------------------------------
-### Compatibility rule
-### -------------------------------------------------------------------
-rule build_chrmap:
-    input:
-        fai = f"{genome_path}.fai"
-    output:
-        map = "output/common/auto_chrmap.tsv"
-    log:
-        "output/common/log/build_chrmap.log"
-    script:
-        workflow.source_path("scripts/build_chrmap.py")
-
 
 ### -------------------------------------------------------------------
 ### Target rule
@@ -131,6 +117,19 @@ rule params:
         echo Cancer analysis: {params.cancer} >> {output} 2> {log}
         """
 
+### -------------------------------------------------------------------
+### Compatibility rule
+### -------------------------------------------------------------------
+rule build_chrmap:
+    input:
+        fai = f"{genome_path}.fai"
+    output:
+        map = "output/common/auto_chrmap.tsv"
+    log:
+        "output/common/log/build_chrmap.log"
+    script:
+        workflow.source_path("scripts/build_chrmap.py")
+
 
 ### -------------------------------------------------------------------
 ### Alignment and expression matrix
@@ -140,7 +139,7 @@ if phased:
 
     rule starAlignment:
         input:
-            vcf=lambda w: config["samples"][w.sample]["phase"],
+            vcf="output/{sample}/1_variant/phase.het.pass.snps.vcf.gz",
             r1=lambda w: config["samples"][w.sample]["R1"],
             r2=lambda w: config["samples"][w.sample]["R2"],
         output:
@@ -278,15 +277,35 @@ rule phase_vcf_filter:
     input:
         phase=lambda w: config["samples"][w.sample]["phase"],
     output:
-        "output/{sample}/1_variant/phase.het.pass.snps.vcf.gz",
+        "output/{sample}/1_variant/phase.het.pass.snps.raw.vcf.gz",
     container:
-        "docker://quay.io/biocontainers/htslib:1.15--h9753748_0"
+        "docker://quay.io/biocontainers/bcftools:1.15--h0ea216a_2"
     log:
         "output/{sample}/log/phase_vcf_filter.log",
     shell:
         """
         mkdir -p output/{wildcards.sample}/1_variant
-        zcat {input.phase} | grep -E '(PASS|#)' | grep -E '(0/1|\\||#)' | awk '(/^#/ || (length($4) == 1 && length($5) == 1))' | bgzip > {output} 2> {log}
+        bcftools view -s {wildcards.sample} -Ou {input.phase} 2> {log} \
+        | bcftools view -m2 -M2 -v snps -f 'PASS,.' \
+            -i 'GT="0/1" || GT="1/0" || GT="0|1" || GT="1|0"' \
+            -Oz -o {output} 2>> {log}
+        """
+        
+# Normalize filtered phased VCF to match reference contig style
+rule normalize_phase_vcf:
+    input:
+        raw = "output/{sample}/1_variant/phase.het.pass.snps.raw.vcf.gz",
+        map = "output/common/auto_chrmap.tsv",
+        fai = f"{genome_path}.fai"
+    output:
+        vcf = "output/{sample}/1_variant/phase.het.pass.snps.vcf.gz"
+    container:
+        "docker://quay.io/biocontainers/bcftools:1.15--h0ea216a_2"
+    log:
+        "output/{sample}/log/normalize_phase_vcf.log"
+    shell:
+        r"""
+        bcftools annotate --rename-chrs {input.map} -Oz -o {output.vcf} {input.raw} 2> {log}
         """
 
 
@@ -317,7 +336,7 @@ if phased:
             ref=genome_path,
             index="output/{sample}/1_variant/phase.het.pass.snps.vcf.gz.tbi",
         output:
-            temp("output/{sample}/StrelkaRNA/results/variants/genome.S1.vcf.gz"),
+            "output/{sample}/StrelkaRNA/results/variants/genome.S1.vcf.gz",
         container:
             "docker://quay.io/biocontainers/strelka:2.9.10--h9ee0642_1"
         log:
@@ -342,7 +361,7 @@ else:
             bam=lambda w: config["samples"][w.sample]["rna"],
             ref=genome_path,
         output:
-            temp("output/{sample}/StrelkaRNA/results/variants/genome.S1.vcf.gz"),
+            "output/{sample}/StrelkaRNA/results/variants/genome.S1.vcf.gz",
         container:
             "docker://quay.io/biocontainers/strelka:2.9.10--h9ee0642_1"
         log:
@@ -363,7 +382,7 @@ rule pass_filt:
     input:
         vcf="output/{sample}/StrelkaRNA/results/variants/genome.S1.vcf.gz",
     output:
-        temp("output/{sample}/1_variant/rna.forceGT.pass.vcf.gz"),
+        "output/{sample}/1_variant/rna.forceGT.pass.vcf.gz",
     container:
         "docker://quay.io/biocontainers/htslib:1.15--h9753748_0"
     log:
@@ -376,7 +395,7 @@ rule rna_snv_index:
     input:
         vcf="output/{sample}/1_variant/rna.forceGT.pass.vcf.gz",
     output:
-        temp("output/{sample}/1_variant/rna.forceGT.pass.vcf.gz.tbi"),
+        "output/{sample}/1_variant/rna.forceGT.pass.vcf.gz.tbi",
     container:
         "docker://quay.io/biocontainers/htslib:1.15--h9753748_0"
     log:

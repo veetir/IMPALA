@@ -503,24 +503,25 @@ if phased:
 
     rule mbased:
         input:
-            phase=lambda w: config["samples"][w.sample]["phase"],
+            phase="output/{sample}/1_variant/phase.het.pass.snps.vcf.gz",
             tsv="output/{sample}/1_variant/rna.isec.filterSnps.tsv",
         output:
             "output/{sample}/2_mBASED/MBASEDresults.rds",
-        threads: 2
+        threads: 1
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
-        params:
-            script="workflow/scripts/mbased.snpEff.R",
         log:
             "output/{sample}/log/mbased.log",
+        params:
+            script="workflow/scripts/mbased_phasing.R",
         shell:
             """
             Rscript {params.script} \
                 --threads={threads} \
                 --phase={input.phase} \
                 --rna={input.tsv} \
-                --outdir=output/{wildcards.sample}/2_mBASED &> {log}
+                --outdir=output/{wildcards.sample}/2_mBASED \
+                &> {log}
             """
 
 else:

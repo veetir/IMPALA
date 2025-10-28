@@ -104,7 +104,21 @@ ggsave(filename = paste0(out, "/aseGenesDot.pdf"), plot = dotplot, width = 5, he
 ####
 #### BARPLOT
 ####
-df_chr <- df[!is.na(df$chr),]
+main_chr <- c(paste0("chr", 1:22), "chrX")
+normalize_chr <- function(chr_vals) {
+  chr_vals <- as.character(chr_vals)
+  chr_vals <- ifelse(chr_vals == "" | is.na(chr_vals), NA_character_, chr_vals)
+  has_prefix <- grepl("^chr", chr_vals, ignore.case = TRUE)
+  chr_vals[!is.na(chr_vals) & !has_prefix] <- paste0("chr", chr_vals[!is.na(chr_vals) & !has_prefix])
+  chr_vals[has_prefix] <- paste0("chr", sub("^chr", "", chr_vals[has_prefix], ignore.case = TRUE))
+  chr_vals[!chr_vals %in% main_chr] <- NA_character_
+  factor(chr_vals, levels = main_chr)
+}
+
+df_chr <- df
+df_chr$chr <- normalize_chr(all_genes$V1[match(df_chr$gene, all_genes$V4)])
+df_chr <- df_chr[!is.na(df_chr$chr),]
+
 barplot <- ggplot(df_chr, aes(x = chr, fill = colour_filt)) +
   geom_bar() +
   scale_fill_manual(values = rev(c("#e0f0ea","#574f7d", "#95adbe", "#e74645"))) +

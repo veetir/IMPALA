@@ -127,6 +127,8 @@ rule build_chrmap:
         map="output/common/auto_chrmap.tsv",
     log:
         "output/common/log/build_chrmap.log",
+    container:
+        "docker://python:3.11-slim"
     script:
         workflow.source_path("scripts/build_chrmap.py")
 

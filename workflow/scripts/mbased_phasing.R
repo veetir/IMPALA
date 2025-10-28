@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 ## ---------------------------------------------------------------------------
-## MBASED (phased only) — single-threaded driver for phased VCF + RNA TSV
+## MBASED script for phased data
 ## ---------------------------------------------------------------------------
 
 suppressMessages(library(optparse))

@@ -72,7 +72,6 @@ else:
     figure = []
 
 
-
 ### -------------------------------------------------------------------
 ### Target rule
 ### -------------------------------------------------------------------
@@ -117,16 +116,17 @@ rule params:
         echo Cancer analysis: {params.cancer} >> {output} 2> {log}
         """
 
+
 ### -------------------------------------------------------------------
 ### Compatibility rule
 ### -------------------------------------------------------------------
 rule build_chrmap:
     input:
-        fai = f"{genome_path}.fai"
+        fai=f"{genome_path}.fai",
     output:
-        map = "output/common/auto_chrmap.tsv"
+        map="output/common/auto_chrmap.tsv",
     log:
-        "output/common/log/build_chrmap.log"
+        "output/common/log/build_chrmap.log",
     script:
         workflow.source_path("scripts/build_chrmap.py")
 
@@ -290,19 +290,20 @@ rule phase_vcf_filter:
             -i 'GT="0/1" || GT="1/0" || GT="0|1" || GT="1|0"' \
             -Oz -o {output} 2>> {log}
         """
-        
+
+
 # Normalize filtered phased VCF to match reference contig style
 rule normalize_phase_vcf:
     input:
-        raw = "output/{sample}/1_variant/phase.het.pass.snps.raw.vcf.gz",
-        map = "output/common/auto_chrmap.tsv",
-        fai = f"{genome_path}.fai"
+        raw="output/{sample}/1_variant/phase.het.pass.snps.raw.vcf.gz",
+        map="output/common/auto_chrmap.tsv",
+        fai=f"{genome_path}.fai",
     output:
-        vcf = "output/{sample}/1_variant/phase.het.pass.snps.vcf.gz"
+        vcf="output/{sample}/1_variant/phase.het.pass.snps.vcf.gz",
     container:
         "docker://quay.io/biocontainers/bcftools:1.15--h0ea216a_2"
     log:
-        "output/{sample}/log/normalize_phase_vcf.log"
+        "output/{sample}/log/normalize_phase_vcf.log",
     shell:
         r"""
         bcftools annotate --rename-chrs {input.map} -Oz -o {output.vcf} {input.raw} 2> {log}
@@ -507,7 +508,7 @@ if phased:
             tsv="output/{sample}/1_variant/rna.isec.filterSnps.tsv",
         output:
             "output/{sample}/2_mBASED/MBASEDresults.rds",
-        threads: 1
+        threads: 10
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
         log:
@@ -520,6 +521,7 @@ if phased:
                 --threads={threads} \
                 --phase={input.phase} \
                 --rna={input.tsv} \
+                --num-sim=0 \
                 --outdir=output/{wildcards.sample}/2_mBASED \
                 &> {log}
             """

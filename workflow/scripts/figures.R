@@ -186,11 +186,27 @@ rpkm_sample_filt2 <- rpkm_sample_filt1[rpkm_sample_filt1$expr > min,]
 # get the input values for the plot
 a <- nrow(rpkm_sample_filt1)
 b <- c(nrow(rpkm_sample_filt2),nrow(rpkm_sample_filt1[rpkm_sample_filt1$expr <= min,] ))
-c <- c(nrow(df),nrow(rpkm_sample_filt2[!rpkm_sample_filt2$gene %in% df$gene,]))
-d <- c(nrow(df[df$padj < 0.05 & df$majorAlleleFrequency > maf_threshold,]),
-       sum(nrow(df[df$padj >= 0.05 & df$majorAlleleFrequency <= maf_threshold,]),
-           nrow(df[df$padj >= 0.05 & df$majorAlleleFrequency > maf_threshold,]),
-           nrow(df[df$padj < 0.05 & df$majorAlleleFrequency <= maf_threshold,])))
+
+# - E = expressed genes (RPKM > min) by biotype
+# - P = MBASED genes (df$gene)
+# - We want flows from Expressed -> Phased among *expressed* genes only: |E and P|
+E_genes <- rpkm_sample_filt2$gene
+df_expr <- df[!is.na(df$RPKM) & df$RPKM > min, , drop = FALSE]  # phased+expressed
+P_genes_expr <- df_expr$gene
+
+# Expressed -> (Phased, Unphased)
+c <- c(
+  length(P_genes_expr),                  # |E and P|
+  length(setdiff(E_genes, P_genes_expr)) # |E not P|
+)
+
+# Phased -> (ASE, Biallelic) restricted to phased+expressed only
+ase_count <- sum(df_expr$padj < 0.05 & df_expr$majorAlleleFrequency > maf_threshold, na.rm = TRUE)
+d <- c(
+  ase_count,                 # ASE among phased+expressed
+  nrow(df_expr) - ase_count  # the rest (BAE)
+)
+
 
 # create a connection data frame
 links <- data.frame(

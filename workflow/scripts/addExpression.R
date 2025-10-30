@@ -37,7 +37,7 @@ sample <- opt$sample
 cat(sprintf("[info] mbased RDS: %s\n", opt$mbased))
 cat(sprintf("[info] RPKM matrix: %s\n", opt$rpkm))
 cat(sprintf("[info] sample (input): %s\n", sample))
-cat(sprintf("[info] min RPKM threshold (--min): %s (strict '>')\n", as.character(opt$min)))
+cat(sprintf("[info] min RPKM threshold (--min): %s (reporting only; no filtering)\n", as.character(opt$min)))
 cat(sprintf("[info] MAF threshold (--maf_threshold): %s\n", as.character(opt$maf_threshold)))
 cat(sprintf("[info] outdir: %s\n", out))
 
@@ -58,7 +58,7 @@ min <- opt$min
 maf_threshold <- opt$maf_threshold 
 
 ## ---------------------------------------------------------------------------
-## VARIABLES
+## Expression + Bins
 ## ---------------------------------------------------------------------------
 
 print("Adding expression")
@@ -98,15 +98,41 @@ cat(sprintf("[info] RPKM assigned: non-NA=%d, NA=%d\n", .non_na_before, .na_befo
 cat(sprintf("[info] RPKM > %s: %d; RPKM <= %s: %d (NAs excluded in counts)\n",
             as.character(min), .gt_min_before, as.character(min), .le_min_before))
 
-results_filt <- results$geneOutput[results$geneOutput$RPKM > min, ]
-cat(sprintf("[info] rows kept after 'RPKM > %s': %d (this step drops both RPKM<=min and RPKM==NA)\n",
-            as.character(min), nrow(results_filt)))
+# Tertile computation
+rpkm_all <- results$geneOutput$RPKM
+rpkm_pos <- rpkm_all[!is.na(rpkm_all) & rpkm_all > 0]
 
-# filter for genes that have an RPKM calculated
-.na_after_thresh <- sum(is.na(results_filt$RPKM))
-results_filt <- results_filt[!is.na(results_filt$RPKM),] 
-cat(sprintf("[info] rows removed by explicit '!is.na(RPKM)' step: %d; rows remaining: %d\n",
-            .na_after_thresh, nrow(results_filt)))
+if (length(rpkm_pos) >= 3 && length(unique(rpkm_pos)) >= 3) {
+  qs <- as.numeric(quantile(rpkm_pos, probs = c(1/3, 2/3), na.rm = TRUE, type = 8))
+  q1 <- qs[1]; q2 <- qs[2]
+} else {
+  if (length(rpkm_pos) == 0) {
+    q1 <- NA_real_; q2 <- NA_real_
+  } else {
+    pos_min <- min(rpkm_pos); pos_max <- max(rpkm_pos)
+    q1 <- pos_min + (pos_max - pos_min)/3
+    q2 <- pos_min + 2*(pos_max - pos_min)/3
+  }
+}
+cat(sprintf("[info] expression tertiles (computed on RPKM>0): q1=%s, q2=%s\n",
+            ifelse(is.na(q1), "NA", format(q1, digits=6)),
+            ifelse(is.na(q2), "NA", format(q2, digits=6))))
+
+expr_bin <- character(length(rpkm_all))
+expr_bin[is.na(rpkm_all)] <- "Missing"
+expr_bin[!is.na(rpkm_all) & rpkm_all == 0] <- "Zero"
+expr_bin[!is.na(rpkm_all) & rpkm_all > 0 & !is.na(q1) & rpkm_all <= q1] <- "Low"
+expr_bin[!is.na(rpkm_all) & rpkm_all > 0 & !is.na(q2) & rpkm_all > q1 & rpkm_all <= q2] <- "Medium"
+expr_bin[!is.na(rpkm_all) & rpkm_all > 0 & !is.na(q2) & rpkm_all > q2] <- "High"
+# If q1/q2 are NA (no/too few positives), mark all positives as "Low"
+expr_bin[!is.na(rpkm_all) & rpkm_all > 0 & is.na(q1)] <- "Low"
+
+results$geneOutput$expr_bin <- factor(expr_bin, levels = c("Missing","Zero","Low","Medium","High"))
+
+# Keep all rows (no filtering by RPKM)
+results_filt <- results$geneOutput
+cat(sprintf("[info] rows kept without RPKM filtering: %d (RPKM zeros and NAs are retained with explicit bins)\n",
+            nrow(results_filt)))
 
 # MAF filter (labels only, no drops)
 cat(sprintf("[info] labeling MAF using threshold %s (no filtering occurs here)\n", as.character(maf_threshold)))
@@ -119,7 +145,7 @@ results_filt$aseResults <- as.factor(ifelse(results_filt$majorAlleleFrequency > 
 cat(sprintf("[info] label counts: ASE=%d, BAE=%d\n", .ase_n, .bae_n))
 
 # rearrange columns to a logical order
-results_filt <- results_filt[,c("gene", "geneBiotype", "RPKM", "allele1IsMajor","majorAlleleFrequency", 
+results_filt <- results_filt[,c("gene", "geneBiotype", "RPKM", "expr_bin", "allele1IsMajor","majorAlleleFrequency", 
                                 "pValueASE", "pValueHeterogeneity", "padj",
                                 "significance", "MAF", "aseResults")]
 

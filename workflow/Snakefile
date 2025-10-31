@@ -346,15 +346,36 @@ if phased:
             "output/{sample}/log/rna_snv_calling.log",
         threads: 8
         shell:
-            """
-            configureStrelkaGermlineWorkflow.py \
-            --bam={input.bam} \
-            --referenceFasta={input.ref} \
-            --forcedGT={input.vcf} \
-            --rna \
-            --runDir=output/{wildcards.sample}/StrelkaRNA &> {log}
+            r"""
+            set -euo pipefail
 
-            output/{wildcards.sample}/StrelkaRNA/runWorkflow.py -m local -j {threads} &> {log} 
+            finaldir="output/{wildcards.sample}/StrelkaRNA"
+            mkdir -p "output/{wildcards.sample}"
+
+            ts="$(date +%Y%m%d%H%M%S)"
+            workdir="$(mktemp -d -p "output/{wildcards.sample}" "StrelkaRNA.${{ts}}.XXXXXX")"
+            echo "[info] Using temp Strelka runDir: $workdir" >> {log}
+
+            # Clean up temp dir on failure
+            trap 'rc=$?; if [ $rc -ne 0 ] && [ -d "$workdir" ]; then echo "[warn] Removing temp runDir $workdir due to failure" >> {log}; rm -rf "$workdir"; fi; exit $rc' EXIT
+
+            configureStrelkaGermlineWorkflow.py \
+                --bam={input.bam} \
+                --referenceFasta={input.ref} \
+                --forcedGT={input.vcf} \
+                --rna \
+                --runDir="$workdir" &>> {log}
+
+            "$workdir"/runWorkflow.py -m local -j {threads} &>> {log}
+
+            # Replace final dir atomically (keep a backup if it exists)
+            if [ -d "$finaldir" ]; then
+                bak="${{finaldir}}.bak.${{ts}}"
+                echo "[info] Moving existing runDir to backup: $bak" >> {log}
+                mv "$finaldir" "$bak"
+            fi
+            mv "$workdir" "$finaldir"
+            trap - EXIT
             """
 
 else:
@@ -371,13 +392,35 @@ else:
             "output/{sample}/log/rna_snv_calling.log",
         threads: 8
         shell:
-            """
+            r"""
+            set -euo pipefail
+
+            finaldir="output/{wildcards.sample}/StrelkaRNA"
+            mkdir -p "output/{wildcards.sample}"
+
+            ts="$(date +%Y%m%d%H%M%S)"
+            workdir="$(mktemp -d -p "output/{wildcards.sample}" "StrelkaRNA.${{ts}}.XXXXXX")"
+            echo "[info] Using temp Strelka runDir: $workdir" >> {log}
+
+            # Clean up temp dir on failure
+            trap 'rc=$?; if [ $rc -ne 0 ] && [ -d "$workdir" ]; then echo "[warn] Removing temp runDir $workdir due to failure" >> {log}; rm -rf "$workdir"; fi; exit $rc' EXIT
+
             configureStrelkaGermlineWorkflow.py \
                 --bam={input.bam} \
                 --referenceFasta={input.ref} \
                 --rna \
-                --runDir=output/{wildcards.sample}/StrelkaRNA &> {log}
-            output/{wildcards.sample}/StrelkaRNA/runWorkflow.py -m local -j {threads} &> {log}
+                --runDir="$workdir" &>> {log}
+
+            "$workdir"/runWorkflow.py -m local -j {threads} &>> {log}
+
+            # Replace final dir atomically (keep a backup if it exists)
+            if [ -d "$finaldir" ]; then
+                bak="${{finaldir}}.bak.${{ts}}"
+                echo "[info] Moving existing runDir to backup: $bak" >> {log}
+                mv "$finaldir" "$bak"
+            fi
+            mv "$workdir" "$finaldir"
+            trap - EXIT
             """
 
 
@@ -453,6 +496,8 @@ if phased:
 
 
 rule snpEff:
+    resources:
+        mem_mb=40000,
     input:
         vcf,
     output:
@@ -510,7 +555,9 @@ if phased:
             tsv="output/{sample}/1_variant/rna.isec.filterSnps.tsv",
         output:
             "output/{sample}/2_mBASED/MBASEDresults.rds",
-        threads: 10
+        threads: 3
+        resources:
+            mem_mb=20000,
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
         log:

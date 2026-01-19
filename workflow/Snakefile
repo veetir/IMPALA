@@ -302,22 +302,43 @@ if phased:
             ref=genome_path,
             index="output/{sample}/1_variant/phase.het.pass.snps.vcf.gz.tbi",
         output:
-            temp("output/{sample}/StrelkaRNA/results/variants/genome.S1.vcf.gz"),
+            "output/{sample}/StrelkaRNA/results/variants/genome.S1.vcf.gz",
         container:
             "docker://quay.io/biocontainers/strelka:2.9.10--h9ee0642_1"
         log:
             "output/{sample}/log/rna_snv_calling.log",
         threads: 8
         shell:
-            """
-            configureStrelkaGermlineWorkflow.py \
-            --bam={input.bam} \
-            --referenceFasta={input.ref} \
-            --forcedGT={input.vcf} \
-            --rna \
-            --runDir=output/{wildcards.sample}/StrelkaRNA &> {log}
+            r"""
+            set -euo pipefail
 
-            output/{wildcards.sample}/StrelkaRNA/runWorkflow.py -m local -j {threads} &> {log} 
+            finaldir="output/{wildcards.sample}/StrelkaRNA"
+            mkdir -p "output/{wildcards.sample}"
+
+            ts="$(date +%Y%m%d%H%M%S)"
+            workdir="$(mktemp -d -p "output/{wildcards.sample}" "StrelkaRNA.${{ts}}.XXXXXX")"
+            echo "[info] Using temp Strelka runDir: $workdir" >> {log}
+
+            # Clean up temp dir on failure
+            trap 'rc=$?; if [ $rc -ne 0 ] && [ -d "$workdir" ]; then echo "[warn] Removing temp runDir $workdir due to failure" >> {log}; rm -rf "$workdir"; fi; exit $rc' EXIT
+
+            configureStrelkaGermlineWorkflow.py \
+                --bam={input.bam} \
+                --referenceFasta={input.ref} \
+                --forcedGT={input.vcf} \
+                --rna \
+                --runDir="$workdir" &>> {log}
+
+            "$workdir"/runWorkflow.py -m local -j {threads} &>> {log}
+
+            # Replace final dir atomically (keep a backup if it exists)
+            if [ -d "$finaldir" ]; then
+                bak="${{finaldir}}.bak.${{ts}}"
+                echo "[info] Moving existing runDir to backup: $bak" >> {log}
+                mv "$finaldir" "$bak"
+            fi
+            mv "$workdir" "$finaldir"
+            trap - EXIT
             """
 
 else:
@@ -327,20 +348,42 @@ else:
             bam=lambda w: config["samples"][w.sample]["rna"],
             ref=genome_path,
         output:
-            temp("output/{sample}/StrelkaRNA/results/variants/genome.S1.vcf.gz"),
+            "output/{sample}/StrelkaRNA/results/variants/genome.S1.vcf.gz",
         container:
             "docker://quay.io/biocontainers/strelka:2.9.10--h9ee0642_1"
         log:
             "output/{sample}/log/rna_snv_calling.log",
         threads: 8
         shell:
-            """
+            r"""
+            set -euo pipefail
+
+            finaldir="output/{wildcards.sample}/StrelkaRNA"
+            mkdir -p "output/{wildcards.sample}"
+
+            ts="$(date +%Y%m%d%H%M%S)"
+            workdir="$(mktemp -d -p "output/{wildcards.sample}" "StrelkaRNA.${{ts}}.XXXXXX")"
+            echo "[info] Using temp Strelka runDir: $workdir" >> {log}
+
+            # Clean up temp dir on failure
+            trap 'rc=$?; if [ $rc -ne 0 ] && [ -d "$workdir" ]; then echo "[warn] Removing temp runDir $workdir due to failure" >> {log}; rm -rf "$workdir"; fi; exit $rc' EXIT
+
             configureStrelkaGermlineWorkflow.py \
                 --bam={input.bam} \
                 --referenceFasta={input.ref} \
                 --rna \
-                --runDir=output/{wildcards.sample}/StrelkaRNA &> {log}
-            output/{wildcards.sample}/StrelkaRNA/runWorkflow.py -m local -j {threads} &> {log}
+                --runDir="$workdir" &>> {log}
+
+            "$workdir"/runWorkflow.py -m local -j {threads} &>> {log}
+
+            # Replace final dir atomically (keep a backup if it exists)
+            if [ -d "$finaldir" ]; then
+                bak="${{finaldir}}.bak.${{ts}}"
+                echo "[info] Moving existing runDir to backup: $bak" >> {log}
+                mv "$finaldir" "$bak"
+            fi
+            mv "$workdir" "$finaldir"
+            trap - EXIT
             """
 
 
@@ -416,12 +459,14 @@ if phased:
 
 
 rule snpEff:
+    resources:
+        mem_mb=40000,
     input:
         vcf,
     output:
-        temp("output/{sample}/1_variant/rna.isec.snps.snpEff.vcf"),
+        "output/{sample}/1_variant/rna.isec.snps.snpEff.vcf",
     container:
-        "docker://quay.io/biocontainers/snpeff:5.0--hdfd78af_1"
+        "docker://quay.io/biocontainers/snpeff:4.3i--0"
     params:
         genome=config["annotationPath"]["snpEff_genomeName"],
         snpEff_config=config["annotationPath"]["snpEff_config"],
@@ -473,7 +518,7 @@ if phased:
             tsv="output/{sample}/1_variant/rna.isec.filterSnps.tsv",
         output:
             "output/{sample}/2_mBASED/MBASEDresults.rds",
-        threads: 2
+        threads: 8
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
         params:

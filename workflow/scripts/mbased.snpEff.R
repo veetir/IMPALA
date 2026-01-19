@@ -2,6 +2,7 @@
 ## ---------------------------------------------------------------------------
 ## Allelic Imbalance in Expression using MBASED, part 1
 ## Vanessa Porter, Oct. 2021
+## Modified in 2026 (github: veetir)
 ## ---------------------------------------------------------------------------
 
 suppressMessages(library(optparse))
@@ -26,11 +27,11 @@ suppressMessages(library(tibble))
 init_bpparam <- function(threads) {
   message(sprintf("[init_bpparam] start threads=%s", threads))
   if (!is.null(threads) && threads > 1) {
-    bpparam <- MulticoreParam(workers = threads)
+    bpparam <- BiocParallel::MulticoreParam(workers = threads)
     message(sprintf("[init_bpparam] end backend=MulticoreParam workers=%s", threads))
     return(bpparam)
   }
-  bpparam <- SerialParam()
+  bpparam <- BiocParallel::SerialParam()
   message("[init_bpparam] end backend=SerialParam workers=1")
   return(bpparam)
 }
@@ -108,7 +109,7 @@ read_phased_vcf <- function(path, sample_col = 10) {
   wh <- wh_raw[, c(1, 2, 4, 5, 9, sample_col)]
   colnames(wh) <- c("CHROM", "POS", "REF", "ALT", "FORMAT", "SAMPLE")
 
-  wh <- wh %>% dplyr::filter(nchar(REF) == 1 & nchar(ALT) == 1)
+  wh <- dplyr::filter(wh, nchar(REF) == 1 & nchar(ALT) == 1)
   snp_rows <- nrow(wh)
 
   fmt_list <- strsplit(wh$FORMAT, ":", fixed = TRUE)
@@ -181,10 +182,16 @@ merge_phase_into_rna <- function(rna_df, vcf_df) {
 #' @return Data frame of single unphased loci.
 identify_single_unphased_genes <- function(rna_df, phased_variants) {
   message(sprintf("[identify_single_unphased_genes] start rna_rows=%d", nrow(rna_df)))
-  single_unphased <- rna_df %>%
-    mutate(phase = variant %in% phased_variants) %>%
-    left_join(rna_df %>% group_by(gene) %>% summarize(n = n(), .groups = "drop")) %>%
-    dplyr::filter(!phase & n == 1)
+  rna_phase <- dplyr::mutate(rna_df, phase = variant %in% phased_variants)
+  gene_counts <- dplyr::summarise(
+    dplyr::group_by(rna_df, gene),
+    n = dplyr::n(),
+    .groups = "drop"
+  )
+  single_unphased <- dplyr::filter(
+    dplyr::left_join(rna_phase, gene_counts, by = "gene"),
+    !phase & n == 1
+  )
 
   genes_count <- length(unique(single_unphased$gene))
   loci_count <- nrow(single_unphased)
@@ -271,18 +278,14 @@ filter_phased_complete <- function(rna_df) {
 filter_dominant_phaseblock_per_gene <- function(phased_df) {
   message(sprintf("[filter_dominant_phaseblock_per_gene] start rows=%d genes=%d",
                   nrow(phased_df), length(unique(phased_df$gene))))
-  phase_counts <- phased_df %>%
-    count(gene, phaseBlock, name = "n") %>%
-    arrange(gene, desc(n), phaseBlock)
+  phase_counts <- dplyr::count(phased_df, gene, phaseBlock, name = "n")
+  phase_counts <- dplyr::arrange(phase_counts, gene, dplyr::desc(n), phaseBlock)
 
-  dominant <- phase_counts %>%
-    group_by(gene) %>%
-    slice(1) %>%
-    ungroup() %>%
-    select(gene, phaseBlock)
+  dominant <- dplyr::slice(dplyr::group_by(phase_counts, gene), 1)
+  dominant <- dplyr::ungroup(dominant)
+  dominant <- dplyr::select(dominant, gene, phaseBlock)
 
-  filtered <- phased_df %>%
-    inner_join(dominant, by = c("gene", "phaseBlock"))
+  filtered <- dplyr::inner_join(phased_df, dominant, by = c("gene", "phaseBlock"))
 
   retained_loci <- nrow(filtered)
   retained_genes <- length(unique(filtered$gene))
@@ -302,11 +305,10 @@ filter_dominant_phaseblock_per_gene <- function(phased_df) {
 #' @return Data frame with SNV.ID column.
 label_snvs <- function(df) {
   message(sprintf("[label_snvs] start rows=%d", nrow(df)))
-  df <- df %>%
-    arrange(CHROM, POS) %>%
-    group_by(gene) %>%
-    mutate(label = paste0("SNV", row_number())) %>%
-    ungroup()
+  df <- dplyr::arrange(df, CHROM, POS)
+  df <- dplyr::group_by(df, gene)
+  df <- dplyr::mutate(df, label = paste0("SNV", dplyr::row_number()))
+  df <- dplyr::ungroup(df)
   df$SNV.ID <- paste0(df$gene, ":", df$label)
   message(sprintf("[label_snvs] end loci=%d genes=%d",
                   nrow(df), length(unique(df$gene))))
@@ -340,16 +342,16 @@ run_mbasesed <- function(df, phased, bpparam, outdir) {
     out_file <- file.path(outdir, "ASEresults_1s_haplotypesUnknown.rds")
   }
 
-  mySNVs <- GRanges(
+  mySNVs <- GenomicRanges::GRanges(
     seqnames = df$CHROM,
-    ranges = IRanges(start = df$POS, width = 1),
+    ranges = IRanges::IRanges(start = df$POS, width = 1),
     aseID = df$gene,
     allele1 = allele1,
     allele2 = allele2
   )
   names(mySNVs) <- df$SNV.ID
 
-  mySample <- SummarizedExperiment(
+  mySample <- SummarizedExperiment::SummarizedExperiment(
     assays = list(
       lociAllele1Counts = matrix(counts1, ncol = 1, dimnames = list(names(mySNVs), "mySample")),
       lociAllele2Counts = matrix(counts2, ncol = 1, dimnames = list(names(mySNVs), "mySample"))
@@ -357,7 +359,7 @@ run_mbasesed <- function(df, phased, bpparam, outdir) {
     rowRanges = mySNVs
   )
 
-  ASEresults <- runMBASED(
+  ASEresults <- MBASED::runMBASED(
     ASESummarizedExperiment = mySample,
     isPhased = phased,
     numSim = 10^6,
@@ -379,7 +381,7 @@ postprocess_results <- function(ASEresults, single_unphased_genes, rna_df) {
   message("[postprocess_results] start")
   results <- summarizeASEResults_1s(ASEresults)
 
-  results$geneOutput$padj <- p.adjust(p = results$geneOutput$pValueASE, method = "BH")
+  results$geneOutput$padj <- stats::p.adjust(p = results$geneOutput$pValueASE, method = "BH")
   results$geneOutput$significance <- as.factor(
     ifelse(results$geneOutput$padj < 0.05, "padj < 0.05", "padj > 0.05")
   )
@@ -406,24 +408,33 @@ postprocess_results <- function(ASEresults, single_unphased_genes, rna_df) {
 #' @return List with geneOutput and locusOutput.
 summarizeASEResults_1s <- function(MBASEDOutput) {
   geneOutputDF <- data.frame(
-    majorAlleleFrequency = assays(MBASEDOutput)$majorAlleleFrequency[, 1],
-    pValueASE = assays(MBASEDOutput)$pValueASE[, 1],
-    pValueHeterogeneity = assays(MBASEDOutput)$pValueHeterogeneity[, 1]
+    majorAlleleFrequency = SummarizedExperiment::assays(MBASEDOutput)$majorAlleleFrequency[, 1],
+    pValueASE = SummarizedExperiment::assays(MBASEDOutput)$pValueASE[, 1],
+    pValueHeterogeneity = SummarizedExperiment::assays(MBASEDOutput)$pValueHeterogeneity[, 1]
   )
 
-  geneAllele <- as.data.frame(assays(metadata(MBASEDOutput)$locusSpecificResults)$allele1IsMajor) %>%
-    rownames_to_column(var = "rowname") %>%
-    dplyr::mutate(gene = unlist(lapply(strsplit(rowname, split = ":"), function(x) { x = x[1] }))) %>%
-    dplyr::group_by(gene) %>%
-    summarise(allele1IsMajor = unique(mySample))
+  geneAllele <- as.data.frame(
+    SummarizedExperiment::assays(S4Vectors::metadata(MBASEDOutput)$locusSpecificResults)$allele1IsMajor
+  )
+  geneAllele <- tibble::rownames_to_column(geneAllele, var = "rowname")
+  geneAllele <- dplyr::mutate(
+    geneAllele,
+    gene = unlist(lapply(strsplit(rowname, split = ":"), function(x) { x = x[1] }))
+  )
+  geneAllele <- dplyr::group_by(geneAllele, gene)
+  geneAllele <- dplyr::summarise(geneAllele, allele1IsMajor = unique(mySample), .groups = "drop")
 
   geneOutputDF$allele1IsMajor <- geneAllele$allele1IsMajor[
     match(rownames(geneOutputDF), geneAllele$gene)
   ]
 
-  lociOutputGR <- rowRanges(metadata(MBASEDOutput)$locusSpecificResults)
-  lociOutputGR$allele1IsMajor <- assays(metadata(MBASEDOutput)$locusSpecificResults)$allele1IsMajor[, 1]
-  lociOutputGR$MAF <- assays(metadata(MBASEDOutput)$locusSpecificResults)$MAF[, 1]
+  lociOutputGR <- SummarizedExperiment::rowRanges(S4Vectors::metadata(MBASEDOutput)$locusSpecificResults)
+  lociOutputGR$allele1IsMajor <- SummarizedExperiment::assays(
+    S4Vectors::metadata(MBASEDOutput)$locusSpecificResults
+  )$allele1IsMajor[, 1]
+  lociOutputGR$MAF <- SummarizedExperiment::assays(
+    S4Vectors::metadata(MBASEDOutput)$locusSpecificResults
+  )$MAF[, 1]
   lociOutputList <- split(lociOutputGR, factor(lociOutputGR$aseID, levels = unique(lociOutputGR$aseID)))
 
   return(
@@ -440,19 +451,19 @@ summarizeASEResults_1s <- function(MBASEDOutput) {
 
 # Make help options
 option_list = list(
-  make_option(c("-p", "--phase"), type = "character", default = NULL,
+  optparse::make_option(c("-p", "--phase"), type = "character", default = NULL,
               help = "Phased VCF file (from WhatsHap)", metavar = "character"),
-  make_option(c("-r", "--rna"), type = "character", default = NULL,
+  optparse::make_option(c("-r", "--rna"), type = "character", default = NULL,
               help = "Tumour RNA vcf file (from Strelka2)", metavar = "character"),
-  make_option(c("-o", "--outdir"), type = "character", default = "mBASED",
+  optparse::make_option(c("-o", "--outdir"), type = "character", default = "mBASED",
               help = "Output directory name", metavar = "character"),
-  make_option(c("-t", "--threads"), type = "integer", default = 1,
+  optparse::make_option(c("-t", "--threads"), type = "integer", default = 1,
               help = "Threads used for mbased", metavar = "integer")
 )
 
 # load in options
-opt_parser <- OptionParser(option_list = option_list)
-opt <- parse_args(opt_parser)
+opt_parser <- optparse::OptionParser(option_list = option_list)
+opt <- optparse::parse_args(opt_parser)
 
 out <- ensure_outdir(opt$outdir)
 bpparam <- init_bpparam(opt$threads)
@@ -468,6 +479,9 @@ rna_filt <- read_rna_tsv(opt$rna)
 ## ---------------------------------------------------------------------------
 
 ### WITH PHASING
+# Phased mode: read WhatsHap VCF, map GT/PS into RNA, and build haplotype-aware
+# alleles/counts. Filter to complete phased loci and dominant phase blocks per 
+# gene, label SNVs, run MBASED (isPhased=TRUE), then summarize results.
 if (!is.null(opt$phase)) {
 
   vcf_df <- read_phased_vcf(opt$phase, sample_col = 10)
@@ -491,6 +505,8 @@ if (!is.null(opt$phase)) {
   results <- postprocess_results(ASEresults_1s_haplotypesKnown, single_unphased, rna_filt)
 
 ### WITHOUT PHASING
+# Unphased mode: label SNVs, run MBASED (isPhased=FALSE), and summarize results.
+# Skips phase-specific filtering and haplotype allele construction.
 } else {
 
   rna_filt <- label_snvs(rna_filt)

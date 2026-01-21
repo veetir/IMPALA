@@ -8,7 +8,7 @@
 suppressMessages(library(optparse))
 suppressMessages(library(dplyr))
 suppressMessages(library(reshape2))
-suppressMessages(library(prob))
+#suppressMessages(library(prob))
 suppressMessages(library(tidyr))
 suppressMessages(library(MBASED))
 suppressMessages(library(SummarizedExperiment))
@@ -362,7 +362,7 @@ run_mbasesed <- function(df, phased, bpparam, outdir) {
   ASEresults <- MBASED::runMBASED(
     ASESummarizedExperiment = mySample,
     isPhased = phased,
-    numSim = 10^6,
+    numSim = 0,
     BPPARAM = bpparam
   )
 

@@ -52,6 +52,12 @@ tissue <- opt$tissue
 tumorContent <- opt$tumorContent
 ase <- read.delim(opt$ase, header = T, comment.char = "#", stringsAsFactors = F)
 
+# check whether expr_bin exists
+# (backward-compatible if upstream file lacks it)
+if (!"expr_bin" %in% colnames(ase)) {
+  ase$expr_bin <- NA
+}
+
 ##########
 # CNV
 ##########
@@ -194,7 +200,7 @@ if (is.null(tissue) | tissue == "") {
 ##########################
 
 summary_table <- ase %>%
-  dplyr::select(gene, RPKM, allele1IsMajor, majorAlleleFrequency, padj, aseResults) %>%
+  dplyr::select(gene, RPKM, expr_bin, allele1IsMajor, majorAlleleFrequency, padj, aseResults) %>%
   dplyr::rename("expression" = RPKM) %>%
   left_join(cnv, by = "gene") %>%
   left_join(dmr, by = "gene") %>%
@@ -208,4 +214,3 @@ summary_table <- ase %>%
   dplyr::mutate(tumorContent = tumorContent) %>%
   write.table(paste0(out, "/summaryTable.tsv"), 
               sep = "\t", quote = F, row.names = F, col.names = T)
-

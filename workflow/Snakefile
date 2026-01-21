@@ -576,7 +576,7 @@ rule addExpression:
             --mbased={input.rds} \
             --sample={wildcards.sample} \
             --rpkm={input.rpkm} \
-            --min=1 \
+            --min=0 \
             --maf_threshold={params.maf} \
             --outdir=output/{wildcards.sample}/2_mBASED &> {log}
         """

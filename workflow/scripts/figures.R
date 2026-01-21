@@ -103,20 +103,75 @@ ggsave(filename = paste0(out, "/aseGenesDot.pdf"), plot = dotplot, width = 5, he
 
 ####
 #### BARPLOT
-####
-df_chr <- df[!is.na(df$chr),]
-barplot <- ggplot(df_chr, aes(x = chr, fill = colour_filt)) +
-  geom_bar() +
-  scale_fill_manual(values = rev(c("#e0f0ea","#574f7d", "#95adbe", "#e74645"))) +
-  theme_bw() +
-  labs(x = "chromosome", y = "number of genes", fill = "ASE results")+
-  theme(axis.title = element_text(size = 12, face = "bold", colour = "black"),
-        axis.text.y = element_text(size = 10, colour = "black"),
-        axis.text.x = element_text(size = 10, colour = "black"),
-        legend.text = element_text(size = 10, colour = "black"),
-        legend.title = element_text(size = 12, face = "bold", colour = "black"))
+main_chr <- c(paste0("chr", 1:22), "chrX")
+normalize_chr <- function(chr_vals) {
+  chr_vals <- as.character(chr_vals)
+  chr_vals[chr_vals == "" | is.na(chr_vals)] <- NA_character_
+  has_prefix <- grepl("^chr", chr_vals, ignore.case = TRUE)
+  chr_vals[!is.na(chr_vals) & !has_prefix] <- paste0("chr", chr_vals[!is.na(chr_vals) & !has_prefix])
+  chr_vals[has_prefix] <- paste0("chr", sub("^chr", "", chr_vals[has_prefix], ignore.case = TRUE))
+  chr_vals[!chr_vals %in% main_chr] <- NA_character_
+  factor(chr_vals, levels = main_chr)
+}
 
-ggsave(filename = paste0(out, "/aseGenesBar.pdf"), plot = barplot, width = 12, height = 5, units = "in")
+cat(sprintf("[figures] df rows=%d, unique genes=%d\n", nrow(df), length(unique(df$gene))))
+cat(sprintf("[figures] all_genes rows=%d, unique gene symbols (V4)=%d\n",
+            nrow(all_genes), length(unique(all_genes$V4))))
+
+# Map df$gene -> chromosome via all_genes (V4 = gene symbol, V1 = chrom)
+df_chr <- df
+midx <- match(df_chr$gene, all_genes$V4)
+raw_chr <- all_genes$V1[midx]
+
+cat(sprintf("[figures] gene->anno mapping: matched=%d (%.1f%%), unmapped=%d (%.1f%%)\n",
+            sum(!is.na(midx)),
+            100 * mean(!is.na(midx)),
+            sum(is.na(midx)),
+            100 * mean(is.na(midx))))
+
+# Normalize chromosomes and drop non-main
+df_chr$chr_raw  <- raw_chr
+df_chr$chr      <- normalize_chr(raw_chr)
+pre_n <- nrow(df_chr)
+df_chr <- df_chr[!is.na(df_chr$chr), , drop = FALSE]
+cat(sprintf("[figures] kept %d/%d rows after chr filter to %s\n",
+            nrow(df_chr), pre_n, paste(main_chr, collapse=",")))
+
+# Quick value counts
+cat("[figures] colour_filt counts (post-filter):\n")
+print(sort(table(df_chr$colour_filt), decreasing = TRUE))
+cat("[figures] chr counts (post-filter):\n")
+print(table(df_chr$chr))
+
+# Write a tiny debug tsv
+dbg_path <- file.path(out, "debug_barplot_input.tsv")
+utils::write.table(
+  df_chr[, c("gene", "colour_filt", "chr_raw", "chr")],
+  file = dbg_path, sep = "\t", quote = FALSE, row.names = FALSE
+)
+cat(sprintf("[figures] wrote %s (n=%d)\n", dbg_path, nrow(df_chr)))
+
+# Plot or placeholder
+out_pdf <- file.path(out, "aseGenesBar.pdf")
+if (nrow(df_chr) == 0L) {
+  cat("[figures] no rows to plot for barplot; writing placeholder PDF.\n")
+  placeholder <- ggplot() + theme_void() +
+    annotate("text", x = 0, y = 0, hjust = 0,
+      label = "No genes available for barplot after filtering.\nSee debug_barplot_input.tsv for details.")
+  ggsave(filename = out_pdf, plot = placeholder, width = 12, height = 5, units = "in")
+} else {
+  barplot <- ggplot(df_chr, aes(x = chr, fill = colour_filt)) +
+    geom_bar() +
+    scale_fill_manual(values = rev(c("#e0f0ea", "#574f7d", "#95adbe", "#e74645"))) +
+    theme_bw() +
+    labs(x = "chromosome", y = "number of genes", fill = "ASE results") +
+    theme(axis.title = element_text(size = 12, face = "bold", colour = "black"),
+          axis.text.y = element_text(size = 10, colour = "black"),
+          axis.text.x = element_text(size = 10, colour = "black"),
+          legend.text = element_text(size = 10, colour = "black"),
+          legend.title = element_text(size = 12, face = "bold", colour = "black"))
+  ggsave(filename = out_pdf, plot = barplot, width = 12, height = 5, units = "in")
+}
 
 
 ####
@@ -131,11 +186,27 @@ rpkm_sample_filt2 <- rpkm_sample_filt1[rpkm_sample_filt1$expr > min,]
 # get the input values for the plot
 a <- nrow(rpkm_sample_filt1)
 b <- c(nrow(rpkm_sample_filt2),nrow(rpkm_sample_filt1[rpkm_sample_filt1$expr <= min,] ))
-c <- c(nrow(df),nrow(rpkm_sample_filt2[!rpkm_sample_filt2$gene %in% df$gene,]))
-d <- c(nrow(df[df$padj < 0.05 & df$majorAlleleFrequency > maf_threshold,]),
-       sum(nrow(df[df$padj >= 0.05 & df$majorAlleleFrequency <= maf_threshold,]),
-           nrow(df[df$padj >= 0.05 & df$majorAlleleFrequency > maf_threshold,]),
-           nrow(df[df$padj < 0.05 & df$majorAlleleFrequency <= maf_threshold,])))
+
+# - E = expressed genes (RPKM > min) by biotype
+# - P = MBASED genes (df$gene)
+# - We want flows from Expressed -> Phased among *expressed* genes only: |E and P|
+E_genes <- rpkm_sample_filt2$gene
+df_expr <- df[!is.na(df$RPKM) & df$RPKM > min, , drop = FALSE]  # phased+expressed
+P_genes_expr <- df_expr$gene
+
+# Expressed -> (Phased, Unphased)
+c <- c(
+  length(P_genes_expr),                  # |E and P|
+  length(setdiff(E_genes, P_genes_expr)) # |E not P|
+)
+
+# Phased -> (ASE, Biallelic) restricted to phased+expressed only
+ase_count <- sum(df_expr$padj < 0.05 & df_expr$majorAlleleFrequency > maf_threshold, na.rm = TRUE)
+d <- c(
+  ase_count,                 # ASE among phased+expressed
+  nrow(df_expr) - ase_count  # the rest (BAE)
+)
+
 
 # create a connection data frame
 links <- data.frame(

@@ -45,26 +45,48 @@ chromSize <- read.delim(opt$chromSize, header = F)
 centPos <-  read.delim(opt$centPos, header = F)
 genes <- read.delim(opt$genes, header = F)
 
+# normalize chromosome naming to tolerate bare IDs, e.g., "1" -> "chr1"
+norm_chr <- function(x) {
+  x <- trimws(as.character(x))
+  needs_prefix <- !is.na(x) & x != "" & !grepl("^chr", x)
+  x[needs_prefix] <- paste0("chr", x[needs_prefix])
+  x
+}
+
+mainChroms <- c(paste0("chr", 1:22), "chrX")
+
+# Apply normalization and filter to canonical chromosomes expected by the plot
+chromSize$V1 <- norm_chr(chromSize$V1)
+chromSize <- chromSize[chromSize$V1 %in% mainChroms, , drop = FALSE]
+if (nrow(chromSize) == 0) {
+  stop(sprintf("No main chromosomes retained from %s after normalization (kept %d rows). Check chromosome naming.", opt$chromSize, nrow(chromSize)))
+}
+
+centPos$V1 <- norm_chr(centPos$V1)
+centPos <- centPos[centPos$V1 %in% mainChroms, , drop = FALSE]
+if (nrow(centPos) == 0) {
+  stop(sprintf("No main chromosomes retained from %s after normalization (kept %d rows). Check centromere coordinates.", opt$centPos, nrow(centPos)))
+}
+
+genes$V1 <- norm_chr(genes$V1)
+genes <- genes[genes$V1 %in% mainChroms, , drop = FALSE]
+
 ## ---------------------------------------------------------------------------
 ## POSITION CHROMOSOME INFO
 ## ---------------------------------------------------------------------------
-
-# subset to the main chromosomes
-chromSize <- chromSize[chromSize$V1 %in% c(paste0("chr", 1:22), "chrX"),]
 
 # Rename columns to chromosome and size
 colnames(chromSize) <- c("chr","size")
 
 # Reorder levels for plotting
-chromSize$chr <- factor(chromSize$chr,levels=c(paste0("chr", 1:22), "chrX"))
-chromSize <- chromSize[chromSize$chr %in% c(paste0("chr", 1:22), "chrX"),]
+chromSize$chr <- factor(chromSize$chr, levels = mainChroms)
 
 # Divide by 1Mb to clean up axis
 chromSize$size <- chromSize$size/1000000
 
 # centromere mapping
 colnames(centPos) <- c("chr", "start", "end")
-centPos$chr <- factor(centPos$chr,levels=c(paste0("chr", 1:22), "chrX"))
+centPos$chr <- factor(centPos$chr, levels = mainChroms)
 centPos$centre <- centPos$start + ((centPos$end - centPos$start)/2)
 centPos$centre <- centPos$centre/1000000
 
@@ -93,7 +115,8 @@ if (!is.null(opt$cna) & opt$cna != ""){
   cna_bed$pos <- cna_bed$pos/1000000
   
   # Change to factor and reorder levels
-  cna_bed$chr <- factor(cna_bed$chr,levels=c(paste0("chr", 1:22), "chrX"))
+  cna_bed$chr <- factor(cna_bed$chr, levels = mainChroms)
+  cna_bed <- cna_bed[!is.na(cna_bed$chr), , drop = FALSE]
   
   cnaLOH <- cna_bed %>% filter(CN.Status == "LOH")
   cnaGAIN <- cna_bed %>% filter(CN.Status == "imbalance") 
@@ -113,7 +136,8 @@ if (!is.null(opt$dmr) & opt$dmr != ""){
   dmr$middle <- (dmr$start + dmr$end) / 2
   
   # Change to factor and reorder levels
-  dmr$chr <- factor(dmr$chr, levels=c(paste0("chr", 1:22), "chrX"))
+  dmr$chr <- factor(dmr$chr, levels = mainChroms)
+  dmr <- dmr[!is.na(dmr$chr), , drop = FALSE]
   
   # count in 1Mb bins
   dmrCount <- data.frame(table(as.factor(paste0(dmr$chr, ":", as.integer(dmr$middle)))))
@@ -122,12 +146,20 @@ if (!is.null(opt$dmr) & opt$dmr != ""){
   dmrPlot <- separate(dmrCount, col = Var1, into = c("chr", "pos"), sep = ":", remove = T)
   
   # scale to fit the plot - i.e. make the maximum width 0.65
-  maxDMR <- max(dmrPlot$Freq)
-  dmrPlot$percMax <- dmrPlot$Freq/maxDMR
-  dmrPlot$percMax <- dmrPlot$percMax * 0.65
+  if (nrow(dmrPlot) > 0) {
+    maxDMR <- max(dmrPlot$Freq)
+    if (maxDMR > 0) {
+      dmrPlot$percMax <- (dmrPlot$Freq / maxDMR) * 0.65
+    } else {
+      dmrPlot$percMax <- rep(0, nrow(dmrPlot))
+    }
+  } else {
+    maxDMR <- 0
+    dmrPlot$percMax <- rep(0, nrow(dmrPlot))
+  }
   
   # Change to factor and reorder levels
-  dmrPlot$chr <- factor(dmrPlot$chr, levels=c(paste0("chr", 1:22), "chrX"))
+  dmrPlot$chr <- factor(dmrPlot$chr, levels = mainChroms)
   dmrPlot$pos <- as.numeric(dmrPlot$pos)
 }
 
@@ -152,6 +184,7 @@ ase$middle <- (ase$start + ase$end)/2
 # get the data frame ready for plotting 
 ase <- ase[,c("chr", "start", "end","middle")]
 ase <- ase[complete.cases(ase),]
+ase <- ase[ase$chr %in% mainChroms, , drop = FALSE]
 
 # Divide by 1Mb for axis
 ase$middle <- ase$middle/1000000
@@ -161,14 +194,23 @@ aseCount <- data.frame(table(as.factor(paste0(ase$chr, ":", as.integer(ase$middl
 
 # split the chromosome name and bin position
 asePlot <- separate(aseCount[aseCount$Var1 != "NA:NA",], col = Var1, into = c("chr", "pos"), sep = ":", remove = T)
+asePlot <- asePlot[!is.na(asePlot$chr) & asePlot$chr %in% mainChroms, , drop = FALSE]
 
 # scale to fit the plot - i.e. make the maximum width 0.65
-maxASE <- max(asePlot$Freq)
-asePlot$percMax <- asePlot$Freq/maxASE
-asePlot$percMax <- asePlot$percMax * 0.65
+if (nrow(asePlot) > 0) {
+  maxASE <- max(asePlot$Freq)
+  if (maxASE > 0) {
+    asePlot$percMax <- (asePlot$Freq / maxASE) * 0.65
+  } else {
+    asePlot$percMax <- rep(0, nrow(asePlot))
+  }
+} else {
+  maxASE <- 0
+  asePlot$percMax <- rep(0, nrow(asePlot))
+}
 
 # Change to factor and reorder levels
-asePlot$chr <- factor(asePlot$chr, levels=c(paste0("chr", 1:22), "chrX"))
+asePlot$chr <- factor(asePlot$chr, levels = mainChroms)
 asePlot$pos <- as.numeric(asePlot$pos)
 
 ## ---------------------------------------------------------------------------
@@ -182,8 +224,18 @@ if (!is.null(opt$dmr) & opt$dmr != "" & !is.null(opt$cna) & opt$cna != ""){
   adL <- data.frame(xmin = c(9.7, 9.7, 9.7, 10.3,9.7,10.3,7.1,7.1), xmax = c(10.35, 10.35,9.75,10.35,9.75,10.35,7.26,7.26), ymin = c(240,210,238,238,208,208,235,205), ymax = c(243,213,243,243,213,213,245,215),
                     fill = c("ase","dmr","ase","ase","dmr","dmr", "gain", "loh"))
   
-  adW <- data.frame(x = c(11.5, 11.2,8.25,7.6,10,10), y = c(240,210,240,210,250,220),
-                    label = c("ASE Gene Density","DMR Density", "Imbalanced CNV", "LOH", as.character(c(maxASE,maxDMR))))
+  adW <- data.frame(
+    x = c(11.5, 11.2, 8.25, 7.6),
+    y = c(240, 210, 240, 210),
+    label = c("ASE Gene Density", "DMR Density", "Imbalanced CNV", "LOH"),
+    stringsAsFactors = FALSE
+  )
+  if (maxASE > 0) {
+    adW <- rbind(adW, data.frame(x = 10, y = 250, label = as.character(maxASE), stringsAsFactors = FALSE))
+  }
+  if (maxDMR > 0) {
+    adW <- rbind(adW, data.frame(x = 10, y = 220, label = as.character(maxDMR), stringsAsFactors = FALSE))
+  }
   
   # plot
   # chromosomes 1 - 12
@@ -277,8 +329,15 @@ if (!is.null(opt$dmr) & opt$dmr != "" & !is.null(opt$cna) & opt$cna != ""){
   adL <- data.frame(xmin = c(9.7, 9.7, 10.3,7.1,7.1), xmax = c(10.35, 9.75,10.35,7.26,7.26), ymin = c(240,238,238,235,205), ymax = c(243,243,243,245,215),
                     fill = c("ase","ase","ase","gain", "loh"))
   
-  adW <- data.frame(x = c(11.5,8.25,7.6,10), y = c(240,240,210,250),
-                    label = c("ASE Gene Density", "Imbalanced CNV", "LOH", as.character(c(maxASE))))
+  adW <- data.frame(
+    x = c(11.5, 8.25, 7.6),
+    y = c(240, 240, 210),
+    label = c("ASE Gene Density", "Imbalanced CNV", "LOH"),
+    stringsAsFactors = FALSE
+  )
+  if (maxASE > 0) {
+    adW <- rbind(adW, data.frame(x = 10, y = 250, label = as.character(maxASE), stringsAsFactors = FALSE))
+  }
   
   # plot
   # chromosomes 1 - 12
@@ -362,8 +421,18 @@ if (!is.null(opt$dmr) & opt$dmr != "" & !is.null(opt$cna) & opt$cna != ""){
   adL <- data.frame(xmin = c(9.7, 9.7, 9.7, 10.3,9.7,10.3), xmax = c(10.35, 10.35,9.75,10.35,9.75,10.35), ymin = c(240,210,238,238,208,208), ymax = c(243,213,243,243,213,213),
                     fill = c("ase","dmr","ase","ase","dmr","dmr"))
   
-  adW <- data.frame(x = c(11.5, 11.2,10,10), y = c(240,210,250,220),
-                    label = c("ASE Gene Density","DMR Density", as.character(c(maxASE,maxDMR))))
+  adW <- data.frame(
+    x = c(11.5, 11.2),
+    y = c(240, 210),
+    label = c("ASE Gene Density", "DMR Density"),
+    stringsAsFactors = FALSE
+  )
+  if (maxASE > 0) {
+    adW <- rbind(adW, data.frame(x = 10, y = 250, label = as.character(maxASE), stringsAsFactors = FALSE))
+  }
+  if (maxDMR > 0) {
+    adW <- rbind(adW, data.frame(x = 10, y = 220, label = as.character(maxDMR), stringsAsFactors = FALSE))
+  }
   
   # plot
   # chromosomes 1 - 12
@@ -437,8 +506,15 @@ if (!is.null(opt$dmr) & opt$dmr != "" & !is.null(opt$cna) & opt$cna != ""){
   adL <- data.frame(xmin = c(9.7, 9.7, 10.3), xmax = c(10.35,9.75,10.35), ymin = c(240,238,238), ymax = c(243,243,243),
                     fill = c("ase","ase","ase"))
   
-  adW <- data.frame(x = c(11.5,10), y = c(240,250),
-                    label = c("ASE Gene Density", as.character(c(maxASE))))
+  adW <- data.frame(
+    x = 11.5,
+    y = 240,
+    label = "ASE Gene Density",
+    stringsAsFactors = FALSE
+  )
+  if (maxASE > 0) {
+    adW <- rbind(adW, data.frame(x = 10, y = 250, label = as.character(maxASE), stringsAsFactors = FALSE))
+  }
   
   # plot
   # chromosomes 1 - 12
@@ -508,4 +584,3 @@ plot <- plot_grid(p1, p2, align = "v", axis = "l", nrow = 2)
 
 # save plot
 ggsave(plot, filename = paste0(opt$out,".pdf"), width = 10, height = 7, units = "in")
-

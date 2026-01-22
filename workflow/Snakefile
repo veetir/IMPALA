@@ -518,7 +518,9 @@ if phased:
             tsv="output/{sample}/1_variant/rna.isec.filterSnps.tsv",
         output:
             "output/{sample}/2_mBASED/MBASEDresults.rds",
-        threads: 8
+        threads: 3
+        resources:
+            mem_mb=20000,
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
         params:
@@ -542,6 +544,8 @@ else:
         output:
             "output/{sample}/2_mBASED/MBASEDresults.rds",
         threads: 2
+        resources:
+            mem_mb=20000,
         container:
             "docker://glenn032787/ase_rcontainer:2.0"
         params:

@@ -38,9 +38,6 @@ suppressMessages(library(tidyr))
 suppressMessages(library(cowplot))
 
 # chromosome size/position info
-#chromSize <- read.delim("/projects/hpv_nanopore_prj/refs/hg38_no_alt_TCGA_HTMCP_HPVs_chromSizes.txt", header = F)
-#centPos <-  read.delim("/projects/hpv_nanopore_prj/refs/hg38_centromere_positions_merged.bed", header = F)
-#genes <- read.delim("/projects/hpv_nanopore_prj/htmcp/ase/pull_trial/vporter-allelespecificexpression/output/HTMCP.03.06.02058/3_cancer/raw/gene_annotation.bed", header = F)
 chromSize <- read.delim(opt$chromSize, header = F)
 centPos <-  read.delim(opt$centPos, header = F)
 genes <- read.delim(opt$genes, header = F)
@@ -94,7 +91,6 @@ centPos$centre <- centPos$centre/1000000
 ## COPY NUMBER
 ## ---------------------------------------------------------------------------
 if (!is.null(opt$cna) & opt$cna != ""){
-  #cna <- read.delim("/projects/hpv_nanopore_prj/htmcp/ploidetect/illumina/Ploidetect-pipeline/ploidetect_out/HTMCP-03-06-02058/A37261_A37189/cna_condensed.txt", header = T)
   cna <- read.delim(opt$cna, header = T)
   cna$chr <- paste0("chr", cna$chr)
   
@@ -127,7 +123,6 @@ if (!is.null(opt$cna) & opt$cna != ""){
 ## ---------------------------------------------------------------------------
 
 if (!is.null(opt$dmr) & opt$dmr != ""){
-  #dmr <- read.delim("/projects/hpv_nanopore_prj/htmcp/call_integration/output/HTMCP-03-06-02058/methylation/diff_meth.csv", header = T)
   dmr <- read.delim(opt$dmr, header = T)
   
   # Divide by 1Mb for axis
@@ -167,7 +162,6 @@ if (!is.null(opt$dmr) & opt$dmr != ""){
 ## ASE GENE HISTOGRAM
 ## ---------------------------------------------------------------------------
 
-#ase <- read.delim("/projects/hpv_nanopore_prj/htmcp/ase/pull_trial/vporter-allelespecificexpression/output/HTMCP.03.06.02058/summaryTable.tsv", header = T)
 ase <- read.delim(opt$ase, header = T)
 
 # filter for ASE genes

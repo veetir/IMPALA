@@ -1,4 +1,3 @@
-#!/gsc/software/linux-x86_64-centos7/R-4.0.2/bin/Rscript --vanilla
 ## ---------------------------------------------------------------------------
 ## GENERATING THE KARYOPLOT FROM ASE DATA
 ## Vanessa Porter, Dec. 2022
